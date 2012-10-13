@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using FluentSecurity.Caching;
 using FluentSecurity.Configuration;
+using FluentSecurity.Diagnostics;
 using FluentSecurity.Internals;
 using FluentSecurity.Policy;
 
@@ -54,19 +55,36 @@ namespace FluentSecurity
 			{
 				var strategy = GetExecutionCacheStrategyForPolicy(policy, defaultResultsCacheLifecycle);
 				var cacheKey = PolicyResultCacheKeyBuilder.CreateFromStrategy(strategy, policy, context);
-				
-				var result = cache.Get<PolicyResult>(cacheKey, strategy.CacheLifecycle.ToLifecycle());
-				if (result == null)
+
+				var policyResult = Publish.RuntimePolicyEvent(() =>
 				{
-					result = policy.Enforce(context);
-					cache.Store(result, cacheKey, strategy.CacheLifecycle.ToLifecycle());
-				}
-				results.Add(result);
-				
-				if (result.ViolationOccured) break;
+					var result = cache.Get<PolicyResult>(cacheKey, strategy.CacheLifecycle.ToLifecycle());
+					if (result == null)
+					{
+						result = policy.Enforce(context);
+						cache.Store(result, cacheKey, strategy.CacheLifecycle.ToLifecycle());
+					}
+					return result;
+				}, r => CreateMessageForResult(r, strategy, cacheKey), context);
+
+				results.Add(policyResult);
+
+				if (policyResult.ViolationOccured) break;
 			}
 
 			return results.AsReadOnly();
+		}
+
+		private static string CreateMessageForResult(PolicyResult result, PolicyResultCacheStrategy strategy, string cacheKey)
+		{
+			return "Enforced policy {0} - {1}! {2}: {3} at {4} with key '{5}'".FormatWith(
+				result.PolicyType.FullName,
+				result.ViolationOccured ? "Violation occured" : "Success",
+				result.Cached ? "Cached. Strategy" : "Strategy",
+				strategy.CacheLifecycle,
+				strategy.CacheLevel,
+				cacheKey
+				);
 		}
 
 		private static Func<ISecurityPolicy, ISecurityPolicy> NonLazyIfPolicyHasCacheKeyProvider()

@@ -8,12 +8,22 @@ namespace FluentSecurity.Diagnostics
 	{
 		public static void RuntimeEvent(Func<string> message, ISecurityContext context)
 		{
-			PublishEvent(() => new RuntimeEvent(context.Id, message.Invoke()));
+			PublishEvent(() => new RuntimeEvent(context.Id, message.Invoke())
+			{
+				Area = context.Data.RouteValues["area"],
+				Controller = context.Data.RouteValues["controller"],
+				Action = context.Data.RouteValues["action"]
+			});
 		}
 
 		public static TResult RuntimeEvent<TResult>(Func<TResult> action, Func<TResult, string> message, ISecurityContext context)
 		{
-			return PublishEventWithTiming(action, result => new RuntimeEvent(context.Id, message.Invoke(result)));
+			return PublishEventWithTiming(action, result => new RuntimeEvent(context.Id, message.Invoke(result))
+			{
+				Area = context.Data.RouteValues["area"],
+				Controller = context.Data.RouteValues["controller"],
+				Action = context.Data.RouteValues["action"]
+			});
 		}
 
 		public static void RuntimePolicyEvent(Func<string> message, ISecurityContext context)

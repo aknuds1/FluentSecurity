@@ -15,7 +15,12 @@ namespace FluentSecurity.Caching
 		public T Get<T>(string cacheKey, Lifecycle lifecycle)
 		{
 			var objectCache = lifecycle.Get().FindCache();
-			return (T) objectCache.Get(cacheKey);
+			var cachedObject = (T) objectCache.Get(cacheKey);
+
+			if (cachedObject is PolicyResult)
+				(cachedObject as PolicyResult).Cached = true;
+			
+			return cachedObject;
 		}
 
 		public void Store<T>(T item, string cacheKey, Lifecycle lifecycle)
